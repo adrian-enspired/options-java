@@ -16,7 +16,6 @@
  */
 package red.enspi.options;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -29,12 +28,14 @@ import red.enspi.exceptable.Exceptable.Signal;
 /**
  * Represents a collection of options.
  *
- * Option sets are immutable: and/or/xor all return new instances.
+ * <p>Option sets are immutable: and/or/xor all return new instances.
  */
 public abstract class OptionSet<T extends Enum<?> & Option> {
 
-  public static <T extends Enum<?> & Option> OptionSet<T> from(@SuppressWarnings("unchecked") T ...options) {
-    return new OptionSet<T>() {}.or(options);
+  @SuppressWarnings("unchecked")
+  public static <T extends Enum<?> & Option> OptionSet<T> of( T ...options) {
+    // come on java, how can you be THIS stupid
+    return new OptionSet<T>((Class<T>) options[0].getClass(), 0L) {}.or(options);
   }
 
   /** The option set's integer value. */
@@ -42,16 +43,29 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
 
   private List<T> options = null;
 
-  public OptionSet() {
-    this(0L);
-  }
+  private Class<T> type;
 
+  /** Canonical constructor. */
+  public OptionSet(long mask) {
+    this.mask = mask;
+  }
   public OptionSet(int mask) {
     this((long) mask);
   }
 
-  public OptionSet(long mask) {
-    this.mask = mask;
+  /** Construct from option values. */
+  public OptionSet(@SuppressWarnings("unchecked") T ...options) {
+    this(Arrays.stream(options).map(T::value).reduce(0L, (a, b) -> a | b));
+  }
+
+  /** Override this if you need to provide a default mask. */
+  public OptionSet() {
+    this(0L);
+  }
+
+  private OptionSet(Class<T> type, long mask) {
+    this(mask);
+    this.type = type;
   }
 
   /** ANDs this set with the given option(s). */
@@ -60,7 +74,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     for (var option : options) {
       newMask = option.and(newMask);
     }
-    return this.from(newMask);
+    return new OptionSet<T>(this.type, newMask) {};
   }
 
   /** Does this option set include (any of) the given option(s)? */
@@ -85,7 +99,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
 
   /** NOTs this set. */
   public OptionSet<T> not() {
-    return this.from(~ this.mask);
+    return new OptionSet<T>(this.type, ~ this.mask) {};
   }
 
   /** Lists all options that can be included in this set. */
@@ -103,7 +117,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     for (var option : options) {
       newMask = option.or(newMask);
     }
-    return this.from(newMask);
+    return new OptionSet<T>(this.type, newMask) {};
   }
 
   /** Lists the options included in this set. */
@@ -123,36 +137,23 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     for (var option : options) {
       newMask = option.xor(newMask);
     }
-    return this.from(newMask);
-  }
-
-  @SuppressWarnings("unchecked")
-  private OptionSet<T> from(long mask) {
-    try {
-      return this.getClass().getDeclaredConstructor(int.class).newInstance(mask);
-    } catch (
-      InstantiationException
-        | IllegalAccessException
-        | IllegalArgumentException
-        | InvocationTargetException
-        | NoSuchMethodException
-        | SecurityException e) {
-      // problem instantiating the actual subtype;
-      //  fall back on returning an anonymous instance of the same generic type
-      return new OptionSet<T>(mask) {};
-    }
+    return new OptionSet<T>(this.type, newMask) {};
   }
 
   @SuppressWarnings("unchecked")
   private Class<T> optionsEnum() {
-    if (
-      this.getClass().getGenericSuperclass() instanceof ParameterizedType pType
-        && pType.getActualTypeArguments() instanceof Type[] tArgs
-        && tArgs.length > 0
-        && tArgs[0] instanceof Class<?> tClass) {
-      return (Class<T>) tClass;
+    if (this.type == null) {
+      if (
+        this.getClass().getGenericSuperclass() instanceof ParameterizedType pType
+          && pType.getActualTypeArguments() instanceof Type[] tArgs
+          && tArgs.length > 0
+          && tArgs[0] instanceof Class<?> tClass) {
+        this.type = (Class<T>) tClass;
+      } else {
+        throw OptionSet.Error.InvalidOptionImplementation.throwable();
+      }
     }
-    throw OptionSet.Error.InvalidOptionImplementation.throwable();
+    return this.type;
   }
 
   /** You're doing it wrong. */

@@ -19,9 +19,6 @@ package red.enspi.options;
 /**
  * Represents individual options.
  *
- * <p>Options are boolean. They are not _settings_: they have no value, they are simply present or not.
- * You should avoid conflicting/exclusive options.
- *
  * <p>N.B.;
  * <ul>
  * <li>Each subtype of this interface can support up to 64 distinct options.
