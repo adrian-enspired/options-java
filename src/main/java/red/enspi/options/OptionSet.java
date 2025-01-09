@@ -4,14 +4,14 @@
  * license    GPL-3.0 (only)
  *
  *  This program is free software: you can redistribute it and/or modify it
- *  under the terms of the GNU General Public License, version 3.
+ *  under the terms of the GNU General public final License, version 3.
  *  The right to apply the terms of later versions of the GPL is RESERVED.
  *
  *  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
  *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- *  See the GNU General Public License for more details.
+ *  See the GNU General public final License for more details.
  *
- *  You should have received a copy of the GNU General Public License along with this program.
+ *  You should have received a copy of the GNU General public final License along with this program.
  *  If not, see <http://www.gnu.org/licenses/gpl-3.0.txt>.
  */
 package red.enspi.options;
@@ -33,17 +33,17 @@ import red.enspi.exceptable.Exceptable.Signal;
 public abstract class OptionSet<T extends Enum<?> & Option> {
 
   @SuppressWarnings("unchecked")
-  public static <T extends Enum<?> & Option> OptionSet<T> of( T ...options) {
-    // come on java, how can you be THIS stupid
+  public static <T extends Enum<?> & Option> OptionSet<T> of(T ...options) {
     return new OptionSet<T>((Class<T>) options[0].getClass(), 0L) {}.or(options);
+    // come on, java,       ^-------------------------------^    ...how can you be THIS stupid
   }
 
   /** The option set's integer value. */
   public final long mask;
 
-  private List<T> options = null;
+  private transient List<T> options = null;
 
-  private Class<T> type;
+  private transient Class<T> type;
 
   /** Canonical constructor. */
   public OptionSet(long mask) {
@@ -54,7 +54,8 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
   }
 
   /** Construct from option values. */
-  public OptionSet(@SuppressWarnings("unchecked") T ...options) {
+  @SafeVarargs
+  public OptionSet(T ...options) {
     this(Arrays.stream(options).map(T::value).reduce(0L, (a, b) -> a | b));
   }
 
@@ -69,7 +70,8 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
   }
 
   /** ANDs this set with the given option(s). */
-  public OptionSet<T> and(@SuppressWarnings("unchecked") T ...options) {
+  @SafeVarargs
+  public final OptionSet<T> and(T ...options) {
     var newMask = this.mask;
     for (var option : options) {
       newMask = option.and(newMask);
@@ -77,18 +79,9 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     return new OptionSet<T>(this.type, newMask) {};
   }
 
-  /** Does this option set include (any of) the given option(s)? */
-  public boolean has(@SuppressWarnings("unchecked") T ...options) {
-    for (var option : options) {
-      if (option.in(this.mask)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** Does this option set include all of the given option(s)? */
-  public boolean hasAll(@SuppressWarnings("unchecked") T ...options) {
+  /** Does this option set include (all of) the given option(s)? */
+  @SafeVarargs
+  public final boolean has(T ...options) {
     for (var option : options) {
       if (! option.in(this.mask)) {
         return false;
@@ -97,13 +90,24 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     return true;
   }
 
+  /** Does this option set include (any of) the given option(s)? */
+  @SafeVarargs
+  public final boolean hasAny(T ...options) {
+    for (var option : options) {
+      if (option.in(this.mask)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** NOTs this set. */
-  public OptionSet<T> not() {
+  public final OptionSet<T> not() {
     return new OptionSet<T>(this.type, ~ this.mask) {};
   }
 
   /** Lists all options that can be included in this set. */
-  public List<T> options() {
+  public final List<T> options() {
     if (this.options == null) {
       this.options = Collections.unmodifiableList(
         Arrays.asList(this.optionsEnum().getEnumConstants()));
@@ -112,7 +116,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
   }
 
   /** ORs this set with the given option(s). */
-  public OptionSet<T> or(@SuppressWarnings("unchecked") T ...options) {
+  public final OptionSet<T> or(T ...options) {
     var newMask = mask;
     for (var option : options) {
       newMask = option.or(newMask);
@@ -121,7 +125,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
   }
 
   /** Lists the options included in this set. */
-  public List<T> toOptions() {
+  public final List<T> toOptions() {
     var list = new ArrayList<T>();
     for (var option : this.options()) {
       if (option.in(this.mask)) {
@@ -132,7 +136,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
   }
 
   /** XORs this set with the given option(s). */
-  public OptionSet<T> xor(@SuppressWarnings("unchecked") T ...options) {
+  public final OptionSet<T> xor(T ...options) {
     var newMask = this.mask;
     for (var option : options) {
       newMask = option.xor(newMask);
@@ -162,7 +166,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     /** Not currently used (thrown), but a ClassCastException probably means this happened. */
     IllegalVarArgsUsage {
       @Override
-      public String description() {
+      public final String description() {
         return "Each of `options` passed must be an instance of the parameterized Option.";
       }
     },
@@ -170,7 +174,7 @@ public abstract class OptionSet<T extends Enum<?> & Option> {
     /** Realistically this should never actually be possible; it's just used to satisfy the compiler. */
     InvalidOptionImplementation {
       @Override
-      public String description() {
+      public final String description() {
         return "OptionSet must be parameterized with an Enum that implements Option.";
       }
     };
